@@ -1,6 +1,6 @@
 ### ----- 
 # author: luo xin, 
-# creat: 2022.9.25, modify: 2023.1.17
+# creat: 2022.9.25, modify: 2025.7.8
 # des: Time formats conversions. year-month-day-hour, day-of-year, decimal year.
 # -----
 
@@ -70,11 +70,13 @@ def doy2date(year, doy):
 
 def dt64_to_dyr(dt64):
     """
-    des: convert datetime64 to decimal year format.    
+    des: convert datetime64 (YYYY-MM-DDTHH:MM:SS or YYYY-MM-DD HH:MM:SS) to decimal year format.    
     e.g., '2020-05-23T03:25:22.959373696' -> 2020.3907103825136.
     args:
         dt64: np.datetime64 format time
     """
+    if isinstance(dt64, str):
+        dt64 = np.datetime64(dt64)
     year = dt64.astype('M8[Y]')
     days = (dt64 - year).astype('timedelta64[D]')
     year_next = year + np.timedelta64(1, 'Y')
