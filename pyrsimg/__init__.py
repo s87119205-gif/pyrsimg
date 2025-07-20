@@ -8,3 +8,4 @@ from pyrsimg.metrics import *
 from pyrsimg.raster_vec import *
 from pyrsimg.rsimg_io import *
 from pyrsimg.transform_time import *
+from pyrsimg.add_scale_north import *

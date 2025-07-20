@@ -5,14 +5,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 def imgShow(img, ax=None, extent=None, color_bands=(2,1,0), clip_percent=2, per_band_clip=False):
     '''
     Description: show the single image.
     args:
         img: (row, col, band) or (row, col), DN range should be in [0,1]
         ax: axes for showing image.
-        extent: list, the coordinates of the extent. 
+        extent: list(left, right, bottom, top), the coordinates of the extent. 
         num_bands: a list/tuple, [red_band,green_band,blue_band]
         clip_percent: for linear strech, value within the range of 0-100. 
         per_band_clip: if True, the band values will be clipped by each band respectively. 
@@ -24,11 +23,11 @@ def imgShow(img, ax=None, extent=None, color_bands=(2,1,0), clip_percent=2, per_
 
     if np.min(img) == np.max(img):
         if len(img.shape) == 2:
-            if ax: ax.imshow(np.clip(img, 0, 1), extent=extent, vmin=0,vmax=1)
-            else: plt.imshow(np.clip(img, 0, 1), extent=extent, vmin=0,vmax=1)
+            if ax: im = ax.imshow(np.clip(img, 0, 1), extent=extent, vmin=0,vmax=1)
+            else: im = plt.imshow(np.clip(img, 0, 1), extent=extent, vmin=0,vmax=1)
         else:
-            if ax: ax.imshow(np.clip(img[:,:,0], 0, 1), extent=extent, vmin=0, vmax=1)
-            else: plt.imshow(np.clip(img[:,:,0], 0, 1), extent=extent, vmin=0, vmax=1)
+            if ax: im = ax.imshow(np.clip(img[:,:,0], 0, 1), extent=extent, vmin=0, vmax=1)
+            else: im = plt.imshow(np.clip(img[:,:,0], 0, 1), extent=extent, vmin=0, vmax=1)
     else:
         if len(img.shape) == 2:
             img_color = np.expand_dims(img, axis=2)
@@ -51,12 +50,13 @@ def imgShow(img, ax=None, extent=None, color_bands=(2,1,0), clip_percent=2, per_
             img_color_clip = (img_color-img_color_hist[0])\
                                      /(img_color_hist[1]-img_color_hist[0]+0.0001)
 
-        if ax: ax.imshow(np.clip(img_color_clip, 0, 1), extent=extent, vmin=0, vmax=1)
-        else: plt.imshow(np.clip(img_color_clip, 0, 1), extent=extent, vmin=0, vmax=1)
+        if ax: im = ax.imshow(np.clip(img_color_clip, 0, 1), extent=extent, vmin=0, vmax=1)
+        else: im = plt.imshow(np.clip(img_color_clip, 0, 1), extent=extent, vmin=0, vmax=1)
+        return im
 
-
-def imsShow(img_list, img_name_list, clip_list=None, figsize=(8,4),\
-                            color_bands_list=None, axis=True, row=None, col=None):
+def imsShow(img_list, img_name_list=None, clip_list=None, figsize=(8,4),\
+                            color_bands_list=None, axs=None, 
+                            axis_ticks=True, row=None, col=None, extent_list=None):
     ''' 
     des: visualize multiple images.
         input: 
@@ -66,25 +66,28 @@ def imsShow(img_list, img_name_list, clip_list=None, figsize=(8,4),\
             color_bands_list: color bands combination corresponding to the images
             row, col: the row and col of the figure
             axis: True or False
+            extent_list: the extent of each image, if not provided, the extent will be set to None
         return: None
     '''
-    if not clip_list:
+    if clip_list is None:
         clip_list = [2 for i in range(len(img_list))]
-    if not color_bands_list:
+    if color_bands_list is None:
         color_bands_list = [[2, 1, 0] for i in range(len(img_list))]
+    if extent_list is None:
+        extent_list = [None for i in range(len(img_list))]
     if row == None:
         row = 1
     if col == None:
         col = len(img_list)
-    fig, ax = plt.subplots(row, col, figsize=figsize)
+    if axs is None:
+        fig, axs = plt.subplots(row, col, figsize=figsize)
     for i in range(row):
         for j in range(col):
             ind = (i*col)+j
             if ind == len(img_list):
                 break
-            imgShow(img=img_list[ind], ax=ax[ind], 
-                        color_bands=color_bands_list[ind], clip_percent=clip_list[ind])        
-            ax[ind].set_title(img_name_list[ind])
-            if not axis: ax[ind].set_axis_off()
-    plt.show()
-                                
+            imgShow(img=img_list[ind], ax=axs[ind], 
+                        color_bands=color_bands_list[ind], clip_percent=clip_list[ind], extent=extent_list[ind])     
+            if img_name_list: axs[ind].set_title(img_name_list[ind])
+            if not axis_ticks: axs[ind].set_axis_off()
+    return axs
