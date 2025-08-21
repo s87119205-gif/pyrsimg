@@ -1,5 +1,5 @@
 ## author: ziyue dou, xin luo
-## create: 2025.5.16  
+## create: 2025.5.16, ziyue dou  
 ## modify: 2025.5.16, xin luo
 ## des: add scale bar and north_arrow to the map
 

@@ -6,6 +6,7 @@
 
 import numpy as np
 from osgeo import osr, ogr
+import math
 
 def get_utm_zone(lon):
   '''
@@ -73,3 +74,33 @@ def imagexy2geo(row, col, gdal_trans):
     y = gdal_trans[3] + col * gdal_trans[4] + row * gdal_trans[5]
     return x, y
 
+
+def deg2meter_resolution(degree_res, center_lat=0):
+    """
+    des: convert degree resolution to meter resolution
+    params:
+        degree_res (float): resolution in degrees
+        center_lat (float): center latitude (default is equator)
+    return:
+        tuple: (resolution in meters along longitude, and for latitude)
+    """
+    R = 6371000  # mean radius of the Earth in meters    
+    lat_res_m = degree_res * (math.pi * R / 180)  # convert latitude resolution (constant)
+    lon_res_m = degree_res * (math.pi * R / 180) * math.cos(math.radians(center_lat))  # convert longitude resolution (varies with latitude)
+    return (lon_res_m, lat_res_m)
+
+
+def meter2deg_resolution(meter_res, center_lat=0):
+    """
+    des: convert meter resolution to degree resolution
+    params:
+        meter_res (float): resolution in meters
+        center_lat (float): reference latitude (default is equator)    
+    return:
+        tuple: (resolution in degrees for longitude, and for latitude)
+    """
+    # radius of the Earth in meters
+    R = 6371000
+    lat_res_deg = (meter_res * 180) / (math.pi * R)  # convert latitude resolution (constant)
+    lon_res_deg = (meter_res * 180) / (math.pi * R * math.cos(math.radians(center_lat)))  # convert longitude resolution (varies with latitude)
+    return (lon_res_deg, lat_res_deg)
