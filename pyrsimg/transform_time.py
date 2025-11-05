@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 def date2doy(year, month, day, hour=0, minute=0):
     '''
     convert year-month-day-hour-minute to doy (day-of-year)
+            e.g., date2doy(2020,3,1) -> 60
     month:0~12
     day:0~31
     hour: 0~24
@@ -21,27 +22,27 @@ def date2doy(year, month, day, hour=0, minute=0):
     month_notleap= [31,28,31,30,31,30,31,31,30,31,30,31]
     doy=0
     if month==1:
-            pass
+        pass
     elif year%4==0 and (year%100!=0 or year%400==0):
-            for i in range(month-1):
-                    doy+=month_leapyear[i]
+        for i in range(month-1):
+            doy+=month_leapyear[i]
     else:
-            for i in range(month-1):
-                    doy+=month_notleap[i]
+        for i in range(month-1):
+            doy+=month_notleap[i]
     doy+=day
     doy+=(hour+minute/60)/24
     return doy
 
 def doy2date(year, doy):
     '''
-    des: convert doy(day-of-year) to specific month and day. 
-    the function returns the month and the day of the month. 
+    des: convert doy(day-of-year) to specific month and day,
+        e.g., doy2date(2020, 60) -> (3, 1)
+        the function returns the month and the day of the month.
     args:
         year
         doy: day of the year
     return:
-        month, day    
-    e.g., doy2date(2020, 60) -> (3, 1)
+        date: (month, day-of-month)
     '''
     month_leapyear=[31,29,31,30,31,30,31,31,30,31,30,31]
     month_notleap= [31,28,31,30,31,30,31,31,30,31,30,31]
@@ -67,20 +68,24 @@ def doy2date(year, doy):
 
     return month, day
 
-def dt64_to_dyr(dt64):
+def dt64_to_dyr(dt64, precision = 'D'):
     """
     des: convert datetime64 (YYYY-MM-DDTHH:MM:SS or YYYY-MM-DD HH:MM:SS) to decimal year format.    
     e.g., '2020-05-23T03:25:22.959373696' -> 2020.3907103825136.
     args:
         dt64: np.datetime64 format time
+        precision: the precision of datetime64, 
+                    e.g., 'D' for days, 's' for seconds, 
+                            'ms' for milliseconds, 'us' for microseconds...
     """
     if isinstance(dt64, str):
         dt64 = np.datetime64(dt64)
     year = dt64.astype('M8[Y]')
-    days = (dt64 - year).astype('timedelta64[D]')
+    dyr_part = (dt64 - year).astype(f'timedelta64[{precision}]')
     year_next = year + np.timedelta64(1, 'Y')
-    days_of_year = (year_next.astype('M8[D]') - year.astype('M8[D]')).astype('timedelta64[D]')
-    dt_float = 1970 + year.astype(float) + days / (days_of_year)
+    dyr_part_of_year = (year_next.astype(f'M8[{precision}]') - 
+                        year.astype(f'M8[{precision}]')).astype(f'timedelta64[{precision}]')
+    dt_float = 1970 + year.astype(float) + dyr_part / (dyr_part_of_year)
     return dt_float
 
 def dyr_to_dt64(decimal_year):
