@@ -1,106 +1,108 @@
 ### ----- 
 # author: luo xin, 
-# creat: 2021.6.15, modify: 2024.6.8
+# creat: 2021.6.15, modify: 2025.11.29
 # des: image location transform between different coordinate system. 
 # -----
 
 import numpy as np
-from osgeo import osr, ogr
-import math
+import rasterio
+from rasterio.transform import Affine
+from pyproj import transformer, CRS
 
 def get_utm_zone(lon):
-  '''
-  des: get utm zone from the given wgs84 coordinates.
-  lon: the given longitute, should be in the range of [-180, 180].
-  return: utm_zone number.
-  '''
-  utm_zone = np.floor(lon/6)+31
-  return int(utm_zone)
+    '''
+    des: get utm zone from the given wgs84 coordinates. 
+    lon: the given longitute, should be in the range of [-180, 180].  
+    return: utm_zone number. 
+    '''
+    utm_zone = np.floor(lon/6)+31  
+    return int(utm_zone)
 
 def coor2coor(srs_from, srs_to, x, y):
-    """
-    Transform coordinates from srs_from to srs_to
+    """ Transform coordinates from srs_from to srs_to
     input:
         srs_from and srs_to: EPSG number, (e.g., 4326, 3031)
         x and y are x-coord and y-coord corresponding to srs_from and srs_to    
     return:
-        x-coord and y-coord in srs_to 
+        x-coord and y-coord in srs_to
     """
-    sr_in = osr.SpatialReference(); sr_in.ImportFromEPSG(int(srs_from))    
-    sr_out = osr.SpatialReference(); sr_out.ImportFromEPSG(int(srs_to))     
-    if int(srs_from) == 4326:
-        sr_in.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-    if int(srs_to) == 4326:
-        sr_out.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-    point = ogr.Geometry(ogr.wkbPoint)
-    point.AddPoint(float(x), float(y))
-    point.AssignSpatialReference(sr_in)
-    point.TransformTo(sr_out)
-    return (point.GetX(), point.GetY())
+    crs_from = CRS.from_epsg(int(srs_from)) 
+    crs_to = CRS.from_epsg(int(srs_to))
+    transformer_obj = transformer.Transformer.from_crs(crs_from, crs_to, always_xy=True)
+    x_to, y_to = transformer_obj.transform(x, y)
+    return x_to, y_to
 
-def geo2imagexy(x, y, gdal_trans, rsimg_array, integer=True):
+def geo2imagexy(x, y, transform, shape= None):
     '''
-    des: from georeferenced location (i.e., lon, lat) to image location(col,row).
-    note: the coordinate system should be same between x/y and gdal_trans.
+    des: from georeferenced location (i.e., lon, lat) to image location(col,row). 
+    note: the coordinate system should be same between x/y and transform.
     input:
-        gdal_trans: obtained by gdal.Open() and .GetGeoTransform(), or by geotif_io.readTiff()['geotrans']
+        transform: rasterio Affine object or GDAL tuple
         x: project or georeferenced x, i.e.,lon
         y: project or georeferenced y, i.e., lat
-        rsimg_array: np.array(), remote sensing image array, shape = (row, col)/(row, col, bands)
+        shape: (optional) tuple (height, width) for boundary check.
+               Default is None (no check).
     return: 
-        image col and row corresponding to the georeferenced location.
+        row, col: image row and col (integer)
     '''
-    a = np.array([[gdal_trans[1], gdal_trans[2]], [gdal_trans[4], gdal_trans[5]]])
-    b = np.array([x - gdal_trans[0], y - gdal_trans[3]])
-    col_img, row_img = np.linalg.solve(a, b)
-    if integer:
-        row_img, col_img = np.floor(row_img).astype('int'), np.floor(col_img).astype('int')
+    if isinstance(transform, Affine):
+        aff = transform
+    elif isinstance(transform, (tuple, list)):
+        aff = Affine.from_gdal(*transform)
+    else:
+        raise TypeError("Transform must be an Affine object or GDAL tuple.")
+    row_img, col_img = rasterio.transform.rowcol(aff, x, y)
     ## Mask out the points outside the image.
-    ids_out = np.where((row_img>=rsimg_array.shape[0]) | (col_img>=rsimg_array.shape[1]))[0]
-    while len(ids_out) > 0:
-        raise IndexError('The x and y out of image range')
+    if shape is not None:
+        h, w = shape[:2]
+        if np.any((row_img < 0) | (row_img >= h) | (col_img < 0) | (col_img >= w)):
+            raise IndexError('The x and y out of image range')
     return row_img, col_img
 
-
-def imagexy2geo(row, col, gdal_trans):
+def imagexy2geo(row, col, transform):
     '''
-    input: 
-        img_gdal: GDAL data (read by gdal.Open()
-        row and col are corresponding to input image (dataset)
-    :return:  
-        geographical coordinates (left up of pixel)
+    des: image location(row, col) to georeferenced location.
+    input:
+        row, col: pixel row and column
+        transform: rasterio Affine object or GDAL tuple
+    return:
+        x, y: georeferenced coordinates
     '''
-    x = gdal_trans[0] + col * gdal_trans[1] + row * gdal_trans[2]
-    y = gdal_trans[3] + col * gdal_trans[4] + row * gdal_trans[5]
+    if isinstance(transform, Affine):
+        aff = transform
+    elif isinstance(transform, (tuple, list)):
+        aff = Affine.from_gdal(*transform)
+    else:
+        raise TypeError("Transform must be an Affine object or GDAL tuple.")
+    x, y = aff * (col, row)
     return x, y
-
 
 def deg2meter_resolution(degree_res, center_lat=0):
     """
     des: convert degree resolution to meter resolution
     params:
-        degree_res (float): resolution in degrees
-        center_lat (float): center latitude (default is equator)
+        degree_res: resolution in degree
+        center_lat: the center latitude where the resolution is calculated
     return:
         tuple: (resolution in meters along longitude, and for latitude)
     """
-    R = 6371000  # mean radius of the Earth in meters    
-    lat_res_m = degree_res * (math.pi * R / 180)  # convert latitude resolution (constant)
-    lon_res_m = degree_res * (math.pi * R / 180) * math.cos(math.radians(center_lat))  # convert longitude resolution (varies with latitude)
-    return (lon_res_m, lat_res_m)
-
+    R = 6371000  # mean radius of the Earth in meters
+    lat_res_m = degree_res * (np.pi * R / 180)  # convert latitude resolution (constant)
+    lon_res_m = degree_res * (np.pi * R / 180) * np.cos(np.radians(center_lat))  # convert longitude resolution (varies with latitude)
+    return (lon_res_m, lat_res_m)   
 
 def meter2deg_resolution(meter_res, center_lat=0):
     """
     des: convert meter resolution to degree resolution
     params:
-        meter_res (float): resolution in meters
-        center_lat (float): reference latitude (default is equator)    
+        meter_res: resolution in meters
+        center_lat: the reference latitude where the resolution is calculated
     return:
-        tuple: (resolution in degrees for longitude, and for latitude)
+        tuple: (resolution in degrees for longitude, and for latitude)  
     """
-    # radius of the Earth in meters
     R = 6371000
-    lat_res_deg = (meter_res * 180) / (math.pi * R)  # convert latitude resolution (constant)
-    lon_res_deg = (meter_res * 180) / (math.pi * R * math.cos(math.radians(center_lat)))  # convert longitude resolution (varies with latitude)
+    lat_res_deg = (meter_res * 180) / (np.pi * R)  # convert latitude resolution (constant)
+    lon_res_deg = (meter_res * 180) / (np.pi * R * np.cos(np.radians(center_lat)))  # convert longitude resolution (varies with latitude)
     return (lon_res_deg, lat_res_deg)
+
+   
