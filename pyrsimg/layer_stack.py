@@ -4,7 +4,6 @@
 
 import rasterio
 import numpy as np
-from osgeo import gdal
 from rasterio.warp import Resampling
 
 def layer_stack(
