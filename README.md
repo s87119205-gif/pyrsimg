@@ -52,7 +52,7 @@ or:
 2. check the metrics, and write the docmentation. 
 3. reprojection for the remote sensing image using rasterio.
 4. replace the gdal by rasterio.
-
+5. create Resize class. 
 
 
 
